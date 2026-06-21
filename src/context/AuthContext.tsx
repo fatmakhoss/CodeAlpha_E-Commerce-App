@@ -1,11 +1,10 @@
 import { createContext, useContext, useEffect, useState, ReactNode } from 'react';
-import { User, Session } from '@supabase/supabase-js';
-import { supabase } from '../lib/supabase';
+import { AppSession, AppUser, authApi, tokenStore } from '../lib/api';
 import { Profile } from '../types';
 
 interface AuthContextType {
-  user: User | null;
-  session: Session | null;
+  user: AppUser | null;
+  session: AppSession | null;
   profile: Profile | null;
   loading: boolean;
   signUp: (email: string, password: string, fullName: string) => Promise<{ error: string | null }>;
@@ -17,64 +16,61 @@ interface AuthContextType {
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
 export function AuthProvider({ children }: { children: ReactNode }) {
-  const [user, setUser] = useState<User | null>(null);
-  const [session, setSession] = useState<Session | null>(null);
+  const [user, setUser] = useState<AppUser | null>(null);
+  const [session, setSession] = useState<AppSession | null>(null);
   const [profile, setProfile] = useState<Profile | null>(null);
   const [loading, setLoading] = useState(true);
 
-  const fetchProfile = async (userId: string) => {
-    const { data } = await supabase
-      .from('profiles')
-      .select('*')
-      .eq('id', userId)
-      .maybeSingle();
-    setProfile(data);
+  const setAuthUser = (authUser: AppUser | null, token = tokenStore.get()) => {
+    setUser(authUser);
+    setSession(authUser && token ? { token } : null);
+    setProfile(authUser ? {
+      id: authUser.id,
+      full_name: authUser.name,
+      role: authUser.role,
+      created_at: '',
+    } : null);
   };
 
   useEffect(() => {
-    supabase.auth.getSession().then(({ data: { session } }) => {
-      setSession(session);
-      setUser(session?.user ?? null);
-      if (session?.user) {
-        fetchProfile(session.user.id);
-      }
+    const token = tokenStore.get();
+    if (!token) {
       setLoading(false);
-    });
+      return;
+    }
 
-    const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
-      setSession(session);
-      setUser(session?.user ?? null);
-      if (session?.user) {
-        (async () => {
-          await fetchProfile(session.user.id);
-        })();
-      } else {
-        setProfile(null);
-      }
-      if (event === 'SIGNED_OUT') setLoading(false);
-    });
-
-    return () => subscription.unsubscribe();
+    authApi.me()
+      .then(authUser => setAuthUser(authUser, token))
+      .catch(() => {
+        tokenStore.clear();
+        setAuthUser(null);
+      })
+      .finally(() => setLoading(false));
   }, []);
 
   const signUp = async (email: string, password: string, fullName: string) => {
-    const { error } = await supabase.auth.signUp({
-      email,
-      password,
-      options: { data: { full_name: fullName } },
-    });
-    if (error) return { error: error.message };
-    return { error: null };
+    try {
+      const { token, user: authUser } = await authApi.register(fullName, email, password);
+      setAuthUser(authUser, token);
+      return { error: null };
+    } catch (error) {
+      return { error: error instanceof Error ? error.message : 'Failed to create account.' };
+    }
   };
 
   const signIn = async (email: string, password: string) => {
-    const { error } = await supabase.auth.signInWithPassword({ email, password });
-    if (error) return { error: error.message };
-    return { error: null };
+    try {
+      const { token, user: authUser } = await authApi.login(email, password);
+      setAuthUser(authUser, token);
+      return { error: null };
+    } catch (error) {
+      return { error: error instanceof Error ? error.message : 'Failed to sign in.' };
+    }
   };
 
   const signOut = async () => {
-    await supabase.auth.signOut();
+    tokenStore.clear();
+    setAuthUser(null);
   };
 
   return (

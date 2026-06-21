@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
-import { ArrowRight, Zap, Shield, RefreshCw, Star } from 'lucide-react';
-import { supabase } from '../lib/supabase';
+import { AlertCircle, ArrowRight, Zap, Shield, RefreshCw, Star } from 'lucide-react';
+import { productsApi } from '../lib/api';
 import { Product } from '../types';
 import ProductCard from '../components/ProductCard';
 import LoadingSpinner from '../components/LoadingSpinner';
@@ -14,16 +14,18 @@ const CATEGORY_ICONS: Record<string, string> = {
 export default function HomePage() {
   const [featured, setFeatured] = useState<Product[]>([]);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState('');
 
   useEffect(() => {
     const fetchFeatured = async () => {
-      const { data } = await supabase
-        .from('products')
-        .select('*')
-        .order('rating', { ascending: false })
-        .limit(8);
-      if (data) setFeatured(data);
-      setLoading(false);
+      try {
+        const params = new URLSearchParams({ sort: '-rating', limit: '8' });
+        setFeatured(await productsApi.list(params));
+      } catch (error) {
+        setError(error instanceof Error ? error.message : 'Failed to load featured products.');
+      } finally {
+        setLoading(false);
+      }
     };
     fetchFeatured();
   }, []);
@@ -129,14 +131,23 @@ export default function HomePage() {
           </Link>
         </div>
 
+        {error && (
+          <div className="flex items-start gap-3 p-4 bg-red-50 border border-red-100 rounded-xl mb-6 text-sm text-red-700">
+            <AlertCircle className="w-5 h-5 flex-shrink-0" />
+            <p>{error}</p>
+          </div>
+        )}
+
         {loading ? (
           <LoadingSpinner className="h-64" />
-        ) : (
+        ) : !error ? (
           <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-5">
             {featured.map(product => (
               <ProductCard key={product.id} product={product} />
             ))}
           </div>
+        ) : (
+          <div className="h-32" />
         )}
       </section>
 

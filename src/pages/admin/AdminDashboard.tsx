@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
-import { Package, ShoppingBag, Users, TrendingUp, Plus, Pencil, Trash2, AlertCircle } from 'lucide-react';
-import { supabase } from '../../lib/supabase';
+import { Package, ShoppingBag, TrendingUp, Plus, Pencil, Trash2, AlertCircle } from 'lucide-react';
+import { ordersApi, productsApi } from '../../lib/api';
 import { Product } from '../../types';
 import LoadingSpinner from '../../components/LoadingSpinner';
 
@@ -20,19 +20,18 @@ export default function AdminDashboard() {
 
   const fetchData = async () => {
     setLoading(true);
-    const [{ data: prods }, { data: orders }] = await Promise.all([
-      supabase.from('products').select('*').order('created_at', { ascending: false }),
-      supabase.from('orders').select('total, status'),
+    const params = new URLSearchParams({ sort: '-createdAt', limit: '50' });
+    const [prods, orders] = await Promise.all([
+      productsApi.list(params),
+      ordersApi.all(),
     ]);
 
-    if (prods) setProducts(prods);
-    if (prods && orders) {
-      setStats({
-        products: prods.length,
-        orders: orders.length,
-        revenue: orders.reduce((s, o) => s + (o.total || 0), 0),
-      });
-    }
+    setProducts(prods);
+    setStats({
+      products: prods.length,
+      orders: orders.length,
+      revenue: orders.reduce((s, o) => s + (o.total || 0), 0),
+    });
     setLoading(false);
   };
 
@@ -42,12 +41,12 @@ export default function AdminDashboard() {
     if (!window.confirm('Delete this product? This cannot be undone.')) return;
     setDeletingId(id);
     setDeleteError('');
-    const { error } = await supabase.from('products').delete().eq('id', id);
-    if (error) {
-      setDeleteError(error.message);
-    } else {
+    try {
+      await productsApi.delete(id);
       setProducts(prev => prev.filter(p => p.id !== id));
       setStats(s => ({ ...s, products: s.products - 1 }));
+    } catch (error) {
+      setDeleteError(error instanceof Error ? error.message : 'Failed to delete product.');
     }
     setDeletingId(null);
   };

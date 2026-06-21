@@ -1,14 +1,14 @@
 import { useState } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
 import { ArrowLeft, CheckCircle2, AlertCircle, CreditCard, Lock } from 'lucide-react';
-import { supabase } from '../lib/supabase';
+import { ordersApi } from '../lib/api';
 import { useCart } from '../context/CartContext';
 import { useAuth } from '../context/AuthContext';
 import { CheckoutFormData } from '../types';
 
 export default function CheckoutPage() {
   const { cartItems, cartTotal, clearCart } = useCart();
-  const { user, profile } = useAuth();
+  const { profile } = useAuth();
   const navigate = useNavigate();
 
   const [form, setForm] = useState<CheckoutFormData>({
@@ -42,45 +42,30 @@ export default function CheckoutPage() {
 
     setLoading(true);
 
-    // Create order
-    const { data: order, error: orderError } = await supabase
-      .from('orders')
-      .insert({
-        user_id: user!.id,
-        status: 'confirmed',
-        total: orderTotal,
-        ...form,
-      })
-      .select()
-      .maybeSingle();
-
-    if (orderError || !order) {
-      setError(orderError?.message || 'Failed to create order. Please try again.');
+    try {
+      const order = await ordersApi.create({
+        orderItems: cartItems.map(item => ({
+          product: item.product_id,
+          quantity: item.quantity,
+        })),
+        shippingAddress: {
+          fullName: form.shipping_name,
+          address: form.shipping_address,
+          city: form.shipping_city,
+          postalCode: form.shipping_zip,
+          country: 'US',
+        },
+        paymentMethod: 'card',
+      });
+      await clearCart();
+      setOrderId(order.id);
+      setSuccess(true);
+    } catch (error) {
+      setError(error instanceof Error ? error.message : 'Failed to create order. Please try again.');
       setLoading(false);
       return;
     }
 
-    // Insert order items
-    const orderItems = cartItems.map(item => ({
-      order_id: order.id,
-      product_id: item.product_id,
-      product_name: item.product?.name || '',
-      product_image: item.product?.image_url || '',
-      quantity: item.quantity,
-      price: item.product?.price ?? 0,
-    }));
-
-    const { error: itemsError } = await supabase.from('order_items').insert(orderItems);
-
-    if (itemsError) {
-      setError(itemsError.message);
-      setLoading(false);
-      return;
-    }
-
-    await clearCart();
-    setOrderId(order.id);
-    setSuccess(true);
     setLoading(false);
   };
 

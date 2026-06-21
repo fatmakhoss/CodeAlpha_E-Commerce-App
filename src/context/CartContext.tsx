@@ -1,7 +1,7 @@
 import { createContext, useContext, useEffect, useState, ReactNode } from 'react';
-import { supabase } from '../lib/supabase';
 import { CartItem } from '../types';
 import { useAuth } from './AuthContext';
+import { cartApi } from '../lib/api';
 
 interface CartContextType {
   cartItems: CartItem[];
@@ -25,12 +25,11 @@ export function CartProvider({ children }: { children: ReactNode }) {
   const fetchCart = async () => {
     if (!user) { setCartItems([]); return; }
     setLoading(true);
-    const { data, error } = await supabase
-      .from('cart_items')
-      .select('*, product:products(*)')
-      .eq('user_id', user.id)
-      .order('created_at', { ascending: true });
-    if (!error && data) setCartItems(data as CartItem[]);
+    try {
+      setCartItems(await cartApi.get());
+    } catch {
+      setCartItems([]);
+    }
     setLoading(false);
   };
 
@@ -39,18 +38,10 @@ export function CartProvider({ children }: { children: ReactNode }) {
   const addToCart = async (productId: string, quantity = 1) => {
     if (!user) return { error: 'Please sign in to add items to cart' };
 
-    const existing = cartItems.find(i => i.product_id === productId);
-    if (existing) {
-      const { error } = await supabase
-        .from('cart_items')
-        .update({ quantity: existing.quantity + quantity })
-        .eq('id', existing.id);
-      if (error) return { error: error.message };
-    } else {
-      const { error } = await supabase
-        .from('cart_items')
-        .insert({ product_id: productId, quantity, user_id: user.id });
-      if (error) return { error: error.message };
+    try {
+      await cartApi.add(productId, quantity);
+    } catch (error) {
+      return { error: error instanceof Error ? error.message : 'Failed to add item to cart' };
     }
     await fetchCart();
     return { error: null };
@@ -58,18 +49,18 @@ export function CartProvider({ children }: { children: ReactNode }) {
 
   const updateQuantity = async (itemId: string, quantity: number) => {
     if (quantity <= 0) { await removeFromCart(itemId); return; }
-    await supabase.from('cart_items').update({ quantity }).eq('id', itemId);
+    await cartApi.update(itemId, quantity);
     await fetchCart();
   };
 
   const removeFromCart = async (itemId: string) => {
-    await supabase.from('cart_items').delete().eq('id', itemId);
+    await cartApi.remove(itemId);
     setCartItems(prev => prev.filter(i => i.id !== itemId));
   };
 
   const clearCart = async () => {
     if (!user) return;
-    await supabase.from('cart_items').delete().eq('user_id', user.id);
+    await cartApi.clear();
     setCartItems([]);
   };
 

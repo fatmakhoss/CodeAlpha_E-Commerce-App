@@ -54,7 +54,7 @@ export default function Footer() {
         </div>
         <div className="border-t border-gray-800 mt-8 pt-6 flex flex-col sm:flex-row justify-between items-center gap-2 text-xs">
           <p>© {new Date().getFullYear()} ShopAlpha — CodeAlpha Internship Project</p>
-          <p>Built with React + Vite + Supabase + Tailwind CSS</p>
+          <p>Built with React + Vite + MongoDB + Tailwind CSS</p>
         </div>
       </div>
     </footer>

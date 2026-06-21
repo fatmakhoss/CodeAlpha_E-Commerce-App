@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { Package, ChevronDown, ChevronUp, ShoppingBag } from 'lucide-react';
-import { supabase } from '../lib/supabase';
+import { ordersApi } from '../lib/api';
 import { Order } from '../types';
 import { useAuth } from '../context/AuthContext';
 import LoadingSpinner from '../components/LoadingSpinner';
@@ -23,12 +23,7 @@ export default function OrdersPage() {
   useEffect(() => {
     const fetchOrders = async () => {
       if (!user) return;
-      const { data } = await supabase
-        .from('orders')
-        .select('*, order_items(*)')
-        .eq('user_id', user.id)
-        .order('created_at', { ascending: false });
-      if (data) setOrders(data as Order[]);
+      setOrders(await ordersApi.myOrders());
       setLoading(false);
     };
     fetchOrders();

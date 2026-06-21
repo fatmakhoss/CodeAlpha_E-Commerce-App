@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import { useParams, Link, useNavigate } from 'react-router-dom';
 import { ArrowLeft, Star, ShoppingCart, Package, Shield, Truck, Minus, Plus, AlertCircle } from 'lucide-react';
-import { supabase } from '../lib/supabase';
+import { productsApi } from '../lib/api';
 import { Product } from '../types';
 import { useCart } from '../context/CartContext';
 import { useAuth } from '../context/AuthContext';
@@ -23,17 +23,17 @@ export default function ProductDetailPage() {
   useEffect(() => {
     const fetchProduct = async () => {
       setLoading(true);
-      const { data } = await supabase.from('products').select('*').eq('id', id).maybeSingle();
-      if (!data) { navigate('/products'); return; }
-      setProduct(data);
+      try {
+        const data = await productsApi.get(id!);
+        setProduct(data);
 
-      const { data: rel } = await supabase
-        .from('products')
-        .select('*')
-        .eq('category', data.category)
-        .neq('id', id)
-        .limit(4);
-      if (rel) setRelated(rel);
+        const params = new URLSearchParams({ category: data.category, limit: '5' });
+        const rel = await productsApi.list(params);
+        setRelated(rel.filter(item => item.id !== id).slice(0, 4));
+      } catch {
+        navigate('/products');
+        return;
+      }
       setLoading(false);
     };
     fetchProduct();

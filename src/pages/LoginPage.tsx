@@ -103,7 +103,7 @@ export default function LoginPage() {
 
           <div className="mt-4 p-3 bg-blue-50 rounded-xl border border-blue-100">
             <p className="text-xs text-blue-700 font-medium mb-1">Demo Admin Account</p>
-            <p className="text-xs text-blue-600">Register with any email, then use the Supabase dashboard to set role='admin' in the profiles table.</p>
+            <p className="text-xs text-blue-600">Register with any email, then set the user's role to admin in MongoDB.</p>
           </div>
         </div>
       </div>

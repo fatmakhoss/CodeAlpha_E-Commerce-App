@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import { useNavigate, useParams, Link } from 'react-router-dom';
 import { ArrowLeft, AlertCircle, CheckCircle2 } from 'lucide-react';
-import { supabase } from '../../lib/supabase';
+import { productsApi } from '../../lib/api';
 import { ProductFormData } from '../../types';
 
 const CATEGORIES = ['Electronics', 'Clothing', 'Accessories', 'Footwear', 'Furniture', 'Sports', 'General'];
@@ -29,8 +29,8 @@ export default function ProductFormPage() {
   useEffect(() => {
     if (!isEdit) return;
     const fetchProduct = async () => {
-      const { data } = await supabase.from('products').select('*').eq('id', id).maybeSingle();
-      if (data) {
+      try {
+        const data = await productsApi.get(id!);
         setForm({
           name: data.name,
           description: data.description,
@@ -39,6 +39,8 @@ export default function ProductFormPage() {
           image_url: data.image_url,
           stock: String(data.stock),
         });
+      } catch {
+        setError('Product not found.');
       }
       setLoading(false);
     };
@@ -70,20 +72,23 @@ export default function ProductFormPage() {
       description: form.description.trim(),
       price: Number(form.price),
       category: form.category,
-      image_url: form.image_url.trim(),
+      imageUrl: form.image_url.trim(),
       stock: Number(form.stock),
-      updated_at: new Date().toISOString(),
     };
 
-    let dbError;
-    if (isEdit) {
-      ({ error: dbError } = await supabase.from('products').update(payload).eq('id', id));
-    } else {
-      ({ error: dbError } = await supabase.from('products').insert({ ...payload, rating: 0, review_count: 0 }));
+    try {
+      if (isEdit) {
+        await productsApi.update(id!, payload);
+      } else {
+        await productsApi.create(payload);
+      }
+    } catch (error) {
+      setSaving(false);
+      setError(error instanceof Error ? error.message : 'Failed to save product.');
+      return;
     }
 
     setSaving(false);
-    if (dbError) { setError(dbError.message); return; }
     setSuccess(true);
     setTimeout(() => navigate('/admin'), 1200);
   };

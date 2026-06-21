@@ -1,7 +1,7 @@
 import { useEffect, useState, useCallback } from 'react';
 import { useSearchParams } from 'react-router-dom';
-import { Search, SlidersHorizontal, X, ChevronDown } from 'lucide-react';
-import { supabase } from '../lib/supabase';
+import { AlertCircle, Search, SlidersHorizontal, X, ChevronDown } from 'lucide-react';
+import { productsApi } from '../lib/api';
 import { Product } from '../types';
 import ProductCard from '../components/ProductCard';
 import LoadingSpinner from '../components/LoadingSpinner';
@@ -18,6 +18,7 @@ export default function ProductsPage() {
   const [searchParams, setSearchParams] = useSearchParams();
   const [products, setProducts] = useState<Product[]>([]);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState('');
   const [filtersOpen, setFiltersOpen] = useState(false);
 
   const searchQuery = searchParams.get('search') || '';
@@ -34,21 +35,26 @@ export default function ProductsPage() {
 
   const fetchProducts = useCallback(async () => {
     setLoading(true);
-    let query = supabase.from('products').select('*');
-
-    if (searchQuery) {
-      query = query.or(`name.ilike.%${searchQuery}%,description.ilike.%${searchQuery}%,category.ilike.%${searchQuery}%`);
+    setError('');
+    try {
+      const params = new URLSearchParams();
+      if (searchQuery) params.set('search', searchQuery);
+      if (selectedCategory && selectedCategory !== 'All') params.set('category', selectedCategory);
+      params.set('limit', '50');
+      const sortMap: Record<string, string> = {
+        'rating-desc': '-rating',
+        'price-asc': 'price',
+        'price-desc': '-price',
+        'created_at-desc': '-createdAt',
+      };
+      params.set('sort', sortMap[sortBy] || '-createdAt');
+      setProducts(await productsApi.list(params));
+    } catch (error) {
+      setProducts([]);
+      setError(error instanceof Error ? error.message : 'Failed to load products.');
+    } finally {
+      setLoading(false);
     }
-    if (selectedCategory && selectedCategory !== 'All') {
-      query = query.eq('category', selectedCategory);
-    }
-
-    const [field, dir] = sortBy.split('-');
-    query = query.order(field, { ascending: dir === 'asc' });
-
-    const { data, error } = await query;
-    if (!error && data) setProducts(data);
-    setLoading(false);
   }, [searchQuery, selectedCategory, sortBy]);
 
   useEffect(() => { fetchProducts(); }, [fetchProducts]);
@@ -148,9 +154,16 @@ export default function ProductsPage() {
 
           {/* Product grid */}
           <div className="flex-1 min-w-0">
+            {error && (
+              <div className="flex items-start gap-3 p-4 bg-red-50 border border-red-100 rounded-xl mb-5 text-sm text-red-700">
+                <AlertCircle className="w-5 h-5 flex-shrink-0" />
+                <p>{error}</p>
+              </div>
+            )}
+
             {loading ? (
               <LoadingSpinner className="h-64" />
-            ) : products.length === 0 ? (
+            ) : !error && products.length === 0 ? (
               <div className="text-center py-16">
                 <div className="text-5xl mb-4">🔍</div>
                 <h3 className="text-lg font-semibold text-gray-900 mb-2">No products found</h3>
@@ -162,12 +175,14 @@ export default function ProductsPage() {
                   Clear filters
                 </button>
               </div>
-            ) : (
+            ) : !error ? (
               <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-5">
                 {products.map(product => (
                   <ProductCard key={product.id} product={product} />
                 ))}
               </div>
+            ) : (
+              <div className="h-32" />
             )}
           </div>
         </div>

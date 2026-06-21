@@ -2,7 +2,7 @@
 
 > **CodeAlpha Full Stack Development Internship — Task 1: Simple E-Commerce Store**
 
-A production-ready full-stack e-commerce web application built with React + Vite, Tailwind CSS, and Supabase (PostgreSQL backend with REST API, JWT auth, and RLS).
+A full-stack e-commerce web application built with React + Vite, Tailwind CSS, Express, and MongoDB.
 
 ---
 
@@ -12,9 +12,9 @@ A production-ready full-stack e-commerce web application built with React + Vite
 |-------|-----------|
 | Frontend | React 18, Vite 5, TypeScript |
 | Styling | Tailwind CSS |
-| Backend / API | Supabase (PostgreSQL + REST) |
-| Auth | Supabase Auth (JWT / email+password) |
-| Database | PostgreSQL via Supabase |
+| Backend / API | Express REST API |
+| Auth | JWT email/password auth |
+| Database | MongoDB via Mongoose |
 | Icons | Lucide React |
 
 ---
@@ -52,7 +52,7 @@ src/
 │   ├── AuthContext.tsx  # Auth state + JWT session
 │   └── CartContext.tsx  # Shopping cart state
 ├── lib/
-│   └── supabase.ts      # Supabase client singleton
+│   └── api.ts           # Express API client
 ├── pages/               # Route-level page components
 │   ├── HomePage.tsx
 │   ├── ProductsPage.tsx
@@ -76,7 +76,7 @@ src/
 ## Database Schema
 
 ### `profiles`
-Extended user data. Auto-created on signup via trigger. `role` field controls admin access.
+User data is stored in MongoDB. The `role` field controls admin access.
 
 ### `products`
 Product catalog. Public read, admin-write RLS policies.
@@ -92,14 +92,19 @@ Order history. Owner-scoped RLS. Stores a snapshot of product name/image at purc
 ## Getting Started (Admin)
 
 1. Register a new account via `/register`
-2. In the Supabase dashboard, go to **Table Editor → profiles**
-3. Find your user row and set `role` to `admin`
-4. Refresh the app — the **Admin Panel** link appears in the nav
+2. In MongoDB, update your user document and set `role` to `admin`
+3. Refresh the app — the **Admin Panel** link appears in the nav
 
 ---
 
 ## Environment Variables
 
-Pre-configured automatically via Bolt/Supabase integration:
-- `VITE_SUPABASE_URL`
-- `VITE_SUPABASE_ANON_KEY`
+Frontend:
+- `VITE_API_URL=http://localhost:5000/api`
+
+Backend:
+- `MONGO_URI`
+- `JWT_SECRET`
+- `JWT_EXPIRES_IN`
+- `PORT`
+- `CLIENT_URL`
