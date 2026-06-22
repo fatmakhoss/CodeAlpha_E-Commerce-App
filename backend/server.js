@@ -1,7 +1,7 @@
 
-require('dotenv').config();
+const path = require('path');
+require('dotenv').config({ path: path.resolve(__dirname, '.env') });
 
-console.log("TEST ENV =", process.env.MONGO_URI);
 const express = require('express');
 const cors = require('cors');
 const morgan = require('morgan');
@@ -12,6 +12,7 @@ const productRoutes = require('./routes/productRoutes');
 const cartRoutes = require('./routes/cartRoutes');
 const orderRoutes = require('./routes/orderRoutes');
 const { notFound, errorHandler } = require('./middleware/errorMiddleware');
+const uploadRoutes = require('./routes/uploadRoutes');
 
 // ─── Connect to MongoDB ──────────────────────────────────────────────────────
 connectDB();
@@ -46,6 +47,7 @@ app.use('/api/auth', authRoutes);
 app.use('/api/products', productRoutes);
 app.use('/api/cart', cartRoutes);
 app.use('/api/orders', orderRoutes);
+app.use('/api/upload', uploadRoutes);
 
 // ─── Error Handling ──────────────────────────────────────────────────────────
 app.use(notFound);

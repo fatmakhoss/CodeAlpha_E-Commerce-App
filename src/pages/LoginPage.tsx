@@ -1,30 +1,37 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { Link, useNavigate, useLocation } from 'react-router-dom';
 import { Eye, EyeOff, Package, AlertCircle } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
+
+const getRedirectPath = (role?: 'user' | 'admin', from?: string) =>
+  from || (role === 'admin' ? '/admin' : '/');
 
 export default function LoginPage() {
   const { signIn, user } = useAuth();
   const navigate = useNavigate();
   const location = useLocation();
-  const from = (location.state as { from?: Location })?.from?.pathname || '/';
+  const from = (location.state as { from?: { pathname?: string } } | null)?.from?.pathname;
 
   const [form, setForm] = useState({ email: '', password: '' });
   const [showPassword, setShowPassword] = useState(false);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
 
-  if (user) { navigate(from, { replace: true }); return null; }
+  useEffect(() => {
+    if (user) navigate(getRedirectPath(user.role, from), { replace: true });
+  }, [from, navigate, user]);
+
+  if (user) return null;
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setError('');
     if (!form.email || !form.password) { setError('Please fill in all fields.'); return; }
     setLoading(true);
-    const { error } = await signIn(form.email, form.password);
+    const { error, user: signedInUser } = await signIn(form.email, form.password);
     setLoading(false);
     if (error) { setError(error); return; }
-    navigate(from, { replace: true });
+    navigate(getRedirectPath(signedInUser?.role, from), { replace: true });
   };
 
   return (

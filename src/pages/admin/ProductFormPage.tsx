@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import { useNavigate, useParams, Link } from 'react-router-dom';
 import { ArrowLeft, AlertCircle, CheckCircle2 } from 'lucide-react';
-import { productsApi } from '../../lib/api';
+import { productsApi, uploadApi } from '../../lib/api';
 import { ProductFormData } from '../../types';
 
 const CATEGORIES = ['Electronics', 'Clothing', 'Accessories', 'Footwear', 'Furniture', 'Sports', 'General'];
@@ -21,6 +21,7 @@ export default function ProductFormPage() {
   const isEdit = Boolean(id);
 
   const [form, setForm] = useState<ProductFormData>(EMPTY_FORM);
+  const [imageFile, setImageFile] = useState<File | null>(null);
   const [loading, setLoading] = useState(isEdit);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState('');
@@ -56,41 +57,57 @@ export default function ProductFormPage() {
     if (!form.description.trim()) return 'Description is required.';
     if (!form.price || isNaN(Number(form.price)) || Number(form.price) < 0) return 'Enter a valid price.';
     if (!form.stock || isNaN(Number(form.stock)) || Number(form.stock) < 0) return 'Enter a valid stock amount.';
-    if (!form.image_url.trim()) return 'Image URL is required.';
+    if (!form.image_url.trim() && !imageFile) return 'Image URL is required.';
     return null;
   };
 
-  const handleSubmit = async (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
-    setError('');
-    const err = validate();
-    if (err) { setError(err); return; }
 
-    setSaving(true);
-    const payload = {
-      name: form.name.trim(),
-      description: form.description.trim(),
-      price: Number(form.price),
-      category: form.category,
-      imageUrl: form.image_url.trim(),
-      stock: Number(form.stock),
-    };
-
-    try {
-      if (isEdit) {
-        await productsApi.update(id!, payload);
-      } else {
-        await productsApi.create(payload);
-      }
-    } catch (error) {
-      setSaving(false);
-      setError(error instanceof Error ? error.message : 'Failed to save product.');
+    const validationError = validate();
+    if (validationError) {
+      setError(validationError);
       return;
     }
 
-    setSaving(false);
-    setSuccess(true);
-    setTimeout(() => navigate('/admin'), 1200);
+    setSaving(true);
+    setError('');
+
+    try {
+      let imageUrl = form.image_url;
+
+      if (imageFile) {
+        imageUrl = await uploadApi.image(imageFile);
+      }
+
+      const payload = {
+        name: form.name.trim(),
+        description: form.description.trim(),
+        price: Number(form.price),
+        category: form.category,
+        imageUrl,
+        stock: Number(form.stock),
+      };
+
+      if (isEdit && id) {
+        await productsApi.update(id, payload);
+      } else {
+        await productsApi.create(payload);
+      }
+
+      setSuccess(true);
+      setTimeout(() => navigate('/admin'), 1500);
+    } catch (err: unknown) {
+      const message =
+        err instanceof Error
+          ? err.message
+          : typeof err === 'string'
+          ? err
+          : 'Unable to save product. Please try again.';
+      setError(message);
+    } finally {
+      setSaving(false);
+    }
   };
 
   if (loading) {
@@ -210,23 +227,25 @@ export default function ProductFormPage() {
             </div>
 
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1.5">Image URL *</label>
+              <label className="block text-sm font-medium text-gray-700 mb-1.5">
+                Product Image *
+              </label>
+
               <input
-                type="url"
-                name="image_url"
-                value={form.image_url}
-                onChange={handleChange}
-                placeholder="https://images.pexels.com/..."
+                type="file"
+                accept="image/*"
+                onChange={(e) => {
+                  if (e.target.files?.[0]) setImageFile(e.target.files[0]);
+                }}
                 className="w-full px-4 py-3 border border-gray-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-gray-900 transition"
-                required
               />
-              {form.image_url && (
+
+              {imageFile && (
                 <div className="mt-2 w-24 h-24 rounded-xl overflow-hidden border border-gray-200 bg-gray-50">
                   <img
-                    src={form.image_url}
+                    src={URL.createObjectURL(imageFile)}
                     alt="Preview"
                     className="w-full h-full object-cover"
-                    onError={e => { (e.target as HTMLImageElement).style.display = 'none'; }}
                   />
                 </div>
               )}

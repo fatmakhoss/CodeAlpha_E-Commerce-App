@@ -8,7 +8,7 @@ interface AuthContextType {
   profile: Profile | null;
   loading: boolean;
   signUp: (email: string, password: string, fullName: string) => Promise<{ error: string | null }>;
-  signIn: (email: string, password: string) => Promise<{ error: string | null }>;
+  signIn: (email: string, password: string) => Promise<{ error: string | null; user?: AppUser }>;
   signOut: () => Promise<void>;
   isAdmin: boolean;
 }
@@ -62,7 +62,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     try {
       const { token, user: authUser } = await authApi.login(email, password);
       setAuthUser(authUser, token);
-      return { error: null };
+      return { error: null, user: authUser };
     } catch (error) {
       return { error: error instanceof Error ? error.message : 'Failed to sign in.' };
     }

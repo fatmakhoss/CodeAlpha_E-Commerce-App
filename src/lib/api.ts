@@ -190,6 +190,38 @@ export const productsApi = {
   },
 };
 
+export const uploadApi = {
+  image: async (file: File) => {
+    const formData = new FormData();
+    formData.append('image', file);
+
+    const token = tokenStore.get();
+    const headers = new Headers();
+    if (token) headers.set('Authorization', `Bearer ${token}`);
+
+    let response: Response;
+    try {
+      response = await fetch(`${API_BASE_URL}/upload`, {
+        method: 'POST',
+        headers,
+        body: formData,
+      });
+    } catch {
+      throw new ApiError(
+        `Cannot reach the API at ${API_BASE_URL}. Make sure the backend server is running and MongoDB is connected.`
+      );
+    }
+
+    const data = await response.json().catch(() => ({}));
+
+    if (!response.ok || data.success === false) {
+      throw new ApiError(data.message || 'Image upload failed.', response.status);
+    }
+
+    return data.imageUrl || data.url;
+  },
+};
+
 export const cartApi = {
   get: async () => {
     const data = await apiRequest<{ cart: any[] }>('/cart');
